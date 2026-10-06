@@ -1,0 +1,9 @@
+*
+!bridge/
+!bridge/*.py
+!tests/
+!tests/*.py
+!integration/
+!integration/*.py
+!requirements.lock
+!Dockerfile

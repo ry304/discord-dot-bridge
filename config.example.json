@@ -1,0 +1,15 @@
+{
+  "owner_discord_id": "111111111111111111",
+  "bot_discord_id": "222222222222222222",
+  "resource": "https://bridge.example.test/mcp",
+  "oauth_issuer": "https://issuer.example.test",
+  "oauth_subject": "REPLACE_WITH_OWNER_OAUTH_SUBJECT",
+  "callback_hosts": ["callback.example.test"],
+  "jwks_file": "/run/config/issuer-public-jwks.json",
+  "enabled_file": "/run/config/bridge-enabled",
+  "discord_bot_token_file": "/run/secrets/discord_bot_token",
+  "state_path": "/data/bridge.sqlite3",
+  "listen_host": "127.0.0.1",
+  "listen_port": 8765,
+  "allowed_origins": []
+}
