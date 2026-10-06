@@ -6,15 +6,16 @@ from .core import iso
 
 
 class DiscordBot(discord.Client):
-    def __init__(self, owner_id, bot_id, submit_message):
+    def __init__(self, owner_id, bot_id, submit_message, *, receive_messages=True):
         intents = discord.Intents.none()
-        intents.dm_messages = True
+        intents.dm_messages = receive_messages
         super().__init__(intents=intents, max_messages=None,
                          allowed_mentions=discord.AllowedMentions.none(),
                          max_ratelimit_timeout=10.0)
         self.owner_id, self.bot_id = str(owner_id), str(bot_id)
         self.submit_message = submit_message
         self.failed_messages = 0
+        self.receive_messages = receive_messages
 
     async def on_ready(self):
         if not self.user or str(self.user.id) != self.bot_id or not self.user.bot:
@@ -22,6 +23,8 @@ class DiscordBot(discord.Client):
             raise RuntimeError("Configured bot identity mismatch")
 
     async def on_message(self, message):
+        if not self.receive_messages:
+            return
         if (not self.user or str(self.user.id) != self.bot_id
                 or not isinstance(message.channel, discord.DMChannel)
                 or str(message.author.id) != self.owner_id or message.author.bot

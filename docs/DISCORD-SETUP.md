@@ -37,6 +37,17 @@ silently enabled. `/ask` is not implemented in this release.
 
 ## Disconnect behavior
 
+For command onboarding before OAuth is ready, `python -m bridge.setup_bot
+--config /private/setup.json --enable-network --register-commands` runs commands
+only. The private JSON contains `owner_discord_id`, `bot_discord_id`, `resource`
+and `discord_bot_token_file` (absolute path); no OAuth placeholders are needed.
+This mode requests zero message intents and ignores all ordinary messages. It
+cannot forward DMs, subscribe, deliver events, or open an MCP listener. Run only
+one bot runtime at a time; stop onboarding before activating the live runtime.
+
+In onboarding mode `/disconnect` is an idempotent acknowledgement that the bridge
+is already disconnected. No grant exists to revoke in that process.
+
 `/disconnect` writes a durable disabled flag before cancelling local subscriptions
 and delivery records through the serialized core. It retains replay/reply records
 to prevent duplicate sends. An already running operation may finish. It does not

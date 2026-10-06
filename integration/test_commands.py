@@ -1,4 +1,5 @@
 import tempfile
+import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ from bridge.core import Bridge
 from bridge.discord_adapter import DiscordBot
 from bridge.http_server import SerialCore, INTERNAL
 from bridge.synthetic import OWNER, BOT, Clock, FakeWebhook, FakeDiscord, subscription, dispatch
+from bridge.setup_bot import SetupControl, load_config
 
 
 class CommandTests(unittest.IsolatedAsyncioTestCase):
@@ -100,3 +102,29 @@ class CommandTests(unittest.IsolatedAsyncioTestCase):
         content = interaction.followup.send.call_args.args[0]
         self.assertIn("could not be confirmed", content)
         self.assertNotIn("private diagnostic", content)
+
+    async def test_onboarding_never_receives_messages_or_enables_bridge(self):
+        ingest = AsyncMock()
+        bot = DiscordBot(OWNER, BOT, ingest, receive_messages=False)
+        try:
+            self.assertEqual(bot.intents.value, 0)
+            await bot.on_message(object())
+            ingest.assert_not_awaited()
+            control = SetupControl()
+            await control.disconnect()
+            self.assertEqual(await control.status(), {"enabled": False, "subscriptions": 0, "pending": 0})
+        finally:
+            await bot.close()
+
+    async def test_onboarding_config_does_not_read_token(self):
+        path = self.root / "setup.json"
+        data = {"owner_discord_id": OWNER, "bot_discord_id": BOT,
+                "resource": "https://bridge.example.test/mcp",
+                "discord_bot_token_file": str(self.root / "does-not-exist")}
+        path.write_text(json.dumps(data))
+        path.chmod(0o600)
+        self.assertEqual(load_config(path), data)
+        data["resource"] = "http://bridge.example.test/mcp"
+        path.write_text(json.dumps(data))
+        with self.assertRaises(ValueError):
+            load_config(path)

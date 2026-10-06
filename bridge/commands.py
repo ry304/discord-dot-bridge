@@ -49,13 +49,17 @@ class OwnerCommands:
                     "After /disconnect, operator re-enablement and a new dot subscription are required.")
             elif action == "status":
                 status = await self.control.status()
-                content = (f"Bridge authorization: {'enabled' if status['enabled'] else 'disabled'}\n"
+                mode = "Command onboarding only; ordinary DMs are ignored.\n" if getattr(self.control, "onboarding", False) else ""
+                content = (mode + f"Bridge authorization: {'enabled' if status['enabled'] else 'disabled'}\n"
                     f"Active subscriptions: {status['subscriptions']}\n"
                     f"Pending events: {status['pending']}\n"
                     "These are local checks; they do not prove that your dot can receive or reply. No private messages or credentials are shown.")
             elif action == "disconnect":
                 await self.control.disconnect()
-                content = ("Bridge disabled; local subscriptions and queued deliveries cancelled. "
+                content = ("Already disconnected: command onboarding has no event subscriptions or DM forwarding. "
+                    "Remove any existing connection/grant in ChatGPT or your identity provider separately."
+                    if getattr(self.control, "onboarding", False) else
+                    "Bridge disabled; local subscriptions and queued deliveries cancelled. "
                     "An operation already in progress may have completed. Remove the subscription/connection in ChatGPT and revoke its OAuth grant there if desired. "
                     "Reconnection requires operator re-enablement; /setup cannot grant access.")
             else:
