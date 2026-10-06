@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 from .commands import OwnerCommands
 from .config import read_secret
 from .discord_adapter import DiscordBot
+from .scope import Scope
 
 
 def load_config(path):
@@ -17,8 +18,11 @@ def load_config(path):
     if os.name != "nt" and file.stat().st_mode & 0o077:
         raise ValueError("Setup configuration must be private")
     data = json.loads(file.read_text())
-    if not isinstance(data, dict) or set(data) != {"owner_discord_id", "bot_discord_id", "resource", "discord_bot_token_file"}:
+    required = {"owner_discord_id", "bot_discord_id", "resource", "discord_bot_token_file"}
+    optional = {"discord_mode", "discord_guild_id", "discord_channel_id"}
+    if not isinstance(data, dict) or not required <= set(data) or set(data) - required - optional:
         raise ValueError("Unexpected setup configuration")
+    Scope(data.get("discord_mode", "dm"), data.get("discord_guild_id"), data.get("discord_channel_id"))
     for name in ("owner_discord_id", "bot_discord_id"):
         value = data[name]
         if not isinstance(value, str) or not value.isascii() or not value.isdigit() or not 17 <= len(value) <= 20:
@@ -51,14 +55,18 @@ async def ignore_message(*args, **kwargs):
 
 async def run(config, register_commands=False):
     bot = DiscordBot(config["owner_discord_id"], config["bot_discord_id"], ignore_message,
-                     receive_messages=False)
+                     receive_messages=False, scope=Scope(config.get("discord_mode", "dm"),
+                         config.get("discord_guild_id"), config.get("discord_channel_id")))
     commands = OwnerCommands(bot, SetupControl(), config["resource"])
     async with bot:
         await bot.login(read_secret(config["discord_bot_token_file"]))
         if not bot.user or str(bot.user.id) != config["bot_discord_id"] or not bot.user.bot:
             raise ValueError("Configured bot identity mismatch")
+        print("discord.login_verified", flush=True)
         if register_commands:
-            await commands.tree.sync()
+            registered = await commands.tree.sync()
+            print(f"discord.commands_registered count={len(registered)}", flush=True)
+        print("discord.gateway_connecting", flush=True)
         await bot.connect(reconnect=True)
 
 

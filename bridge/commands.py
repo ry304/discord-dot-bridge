@@ -8,9 +8,10 @@ class OwnerCommands:
     def __init__(self, bot, control, resource, clock=time.monotonic):
         self.bot, self.control, self.resource, self.clock = bot, control, resource, clock
         self.last_request = float("-inf")
+        guild = bot.scope.mode == "guild_mentions"
         self.tree = app_commands.CommandTree(bot,
-            allowed_contexts=app_commands.AppCommandContext(guild=False, dm_channel=True, private_channel=False),
-            allowed_installs=app_commands.AppInstallationType(guild=False, user=True))
+            allowed_contexts=app_commands.AppCommandContext(guild=guild, dm_channel=not guild, private_channel=False),
+            allowed_installs=app_commands.AppInstallationType(guild=guild, user=not guild))
 
         @self.tree.command(name="setup", description="Show the private bridge setup steps; never enter credentials here")
         async def setup(interaction: discord.Interaction):
@@ -26,10 +27,11 @@ class OwnerCommands:
 
     async def handle(self, interaction, action):
         if (str(interaction.user.id) != self.bot.owner_id or interaction.user.bot
-                or interaction.guild_id is not None
-                or not isinstance(interaction.channel, discord.DMChannel)
+                or (self.bot.scope.mode == "dm" and interaction.guild_id is not None)
+                or (self.bot.scope.mode == "guild_mentions" and str(interaction.guild_id) != self.bot.scope.guild_id)
+                or not self.bot.accepts_channel(interaction.channel)
                 or not self.bot.user or str(self.bot.user.id) != self.bot.bot_id):
-            await interaction.response.send_message("This command is available only to the configured owner in the app DM.", ephemeral=True)
+            await interaction.response.send_message("This command is available only to the configured owner in the configured destination.", ephemeral=True)
             return
         now = self.clock()
         if now - self.last_request < 2:
@@ -44,12 +46,12 @@ class OwnerCommands:
                     "1. The operator must finish OAuth and secure bot setup first. Never paste tokens or passwords here.\n"
                     "2. In ChatGPT Plugins, add the MCP connection using this server URL:\n"
                     f"{self.resource}\n"
-                    "3. Complete login and consent in the browser. In your existing dot, request a subscription to discord.dm.created and replies through discord_reply.\n"
-                    "4. Use /status, then send one test DM. Setup is complete only after a real dot reply.\n"
+                    f"3. Complete login and consent in the browser. In your existing dot, request a subscription to {self.bot.scope.event} and replies through discord_reply.\n"
+                    "4. Use /status, then send one test message (explicitly mention the bot in guild mode). Setup is complete only after a real dot reply.\n"
                     "After /disconnect, operator re-enablement and a new dot subscription are required.")
             elif action == "status":
                 status = await self.control.status()
-                mode = "Command onboarding only; ordinary DMs are ignored.\n" if getattr(self.control, "onboarding", False) else ""
+                mode = "Command onboarding only; ordinary messages are ignored.\n" if getattr(self.control, "onboarding", False) else ""
                 content = (mode + f"Bridge authorization: {'enabled' if status['enabled'] else 'disabled'}\n"
                     f"Active subscriptions: {status['subscriptions']}\n"
                     f"Pending events: {status['pending']}\n"

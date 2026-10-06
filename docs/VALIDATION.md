@@ -2,7 +2,7 @@
 
 Local Windows/Python 3.12.10 checks on 2026-10-06:
 
-**Passed: 26 core/config tests, 18 local adapter/command tests, and the synthetic demo.**
+**Passed: 31 core/config/scope tests, 22 local adapter/command tests, and the synthetic demo.**
 
 - Core/security/config tests exercise authentication, owner/DM filtering, persistent
   subscriptions, expiry/rotation, signatures, callback policy, dedup/replay, bounded
@@ -19,6 +19,11 @@ Local Windows/Python 3.12.10 checks on 2026-10-06:
 - Command checks cover user-install/DM-only registration metadata, owner/channel
   rejection, private status, rate limiting, durable disconnect and honest failure
   reporting. Metadata-only setup rejects all MCP POSTs even with bearer headers.
+- Guild mention checks reject other guilds/channels/users, DMs, threads, bot echoes
+  and missing mentions. They check scope-bound database reuse, event names, fixed
+  reply destinations, fresh SDK channel resolution, nonprivileged intents and
+  ephemeral guild command responses. Guild adapter checks use typed SDK mocks;
+  actual Discord guild delivery/installation is still unverified.
 
 Reproduce with `python -m tests`, `python -m integration`, `python -m bridge demo`.
 The first suite forbids sockets/DNS. The integration runner allows only loopback.
@@ -26,7 +31,7 @@ All identities and content are synthetic; test RSA keys are ephemeral in memory.
 
 Limitations: mock callback HTTP substitutes for external TLS in integration tests;
 the real TLS connection has a socket/SNI unit test, not a live certificate test.
-No real Discord bot, OAuth provider, ChatGPT account/dot or callback was contacted.
+These tests do not contact a real Discord bot, OAuth provider, ChatGPT account/dot or callback.
 Live platform compatibility remains unverified. Docker staging was built and
 tested on Linux; a metadata-only container returned 401 for MCP POSTs and bound
 only to loopback, with non-root/read-only/capability/resource limits. This does

@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
+from .scope import Scope
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,13 @@ class Config:
     listen_host: str = "127.0.0.1"
     listen_port: int = 8765
     allowed_origins: list[str] = None
+    discord_mode: str = "dm"
+    discord_guild_id: str | None = None
+    discord_channel_id: str | None = None
+
+    @property
+    def scope(self):
+        return Scope(self.discord_mode, self.discord_guild_id, self.discord_channel_id)
 
     @classmethod
     def load(cls, path):
@@ -31,6 +39,7 @@ class Config:
         if not isinstance(data, dict):
             raise ValueError("Configuration must be an object")
         config = cls(**data)
+        config.scope  # Validate explicit destination before any credential is read.
         for value in (config.owner_discord_id, config.bot_discord_id):
             if not isinstance(value, str) or not value.isascii() or not value.isdigit() or not 17 <= len(value) <= 20:
                 raise ValueError("Numeric Discord IDs are required")

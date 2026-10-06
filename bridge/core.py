@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from standardwebhooks import Webhook
+from .scope import Scope
 
 EVENT = "discord.dm.created"
 VERSION = "2026-07-28"
@@ -107,7 +108,7 @@ EVENT_DEFINITION = {
                                     ("message_id", "owner_id", "text")}),
 }
 REPLY_TOOL = {
-    "name": "discord_reply", "description": "Reply once to an accepted owner DM. "
+    "name": "discord_reply", "description": "Reply once to an accepted owner message. "
     "The destination is fixed by the original message; supply only the intended reply.",
     "inputSchema": object_schema({"message_id": STRING, "text": STRING}),
     "annotations": {"readOnlyHint": False, "destructiveHint": False,
@@ -118,7 +119,9 @@ REPLY_TOOL = {
 
 class Bridge:
     def __init__(self, database, *, owner_id, bot_id, bearer, callback_hosts,
-                 webhook, discord, clock=time.time, capacity=1000):
+                 webhook, discord, clock=time.time, capacity=1000, scope=None):
+        self.scope = scope or Scope()
+        self.event = self.scope.event
         if not all(isinstance(x, str) and x.isascii() and x.isdigit()
                    for x in (owner_id, bot_id)) or owner_id == bot_id:
             raise ValueError("Distinct owner and bot IDs required")
@@ -154,6 +157,15 @@ class Bridge:
         if not binding:
             with self.db:
                 self.db.execute("INSERT INTO binding VALUES (?,?)", (owner_id, bot_id))
+        self.db.execute("CREATE TABLE IF NOT EXISTS scope_binding(value TEXT)")
+        row = self.db.execute("SELECT value FROM scope_binding").fetchone()
+        legacy_data = self.db.execute("SELECT count(*) FROM messages").fetchone()[0] or self.db.execute("SELECT count(*) FROM subscriptions").fetchone()[0]
+        if (row and row[0] != self.scope.binding) or (not row and legacy_data and self.scope.mode != "dm"):
+            self.db.close()
+            raise ValueError("Destination changed; preserve old state and use a new database")
+        if not row:
+            with self.db:
+                self.db.execute("INSERT INTO scope_binding VALUES (?)", (self.scope.binding,))
 
     def close(self):
         self.db.close()
@@ -175,7 +187,7 @@ class Bridge:
             raise Fault(-32001, "Unauthorized")
 
     def identity(self, params, needs_secret=False):
-        if not isinstance(params, dict) or params.get("name") != EVENT:
+        if not isinstance(params, dict) or params.get("name") != self.event:
             raise Fault(-32602, "Unknown event")
         if params.get("arguments") != {"owner_id": self.owner}:
             raise Fault(-32602, "Owner filter required")
@@ -185,7 +197,7 @@ class Bridge:
         validate_url(d.get("url"), self.hosts)
         if needs_secret:
             signing_key(d.get("secret"))
-        identity = [self.principal, d["url"], EVENT, params["arguments"]]
+        identity = [self.principal, d["url"], self.event, params["arguments"]]
         return "sub_" + hashlib.sha256(canonical(identity).encode()).hexdigest()[:32]
 
     def post(self, url, body, event_id, sid, key, old=None):
@@ -251,18 +263,22 @@ class Bridge:
     def ingest(self, dispatch, *, channel_type, recipient_id):
         """Accept a MESSAGE_CREATE plus trusted channel metadata from bot SDK.
 
-        Caller must resolve an actual one-to-one DM channel (type 1). Do not take
+        Caller must resolve the actual configured channel. Do not take
         channel_type or recipient_id from user text or unauthenticated HTTP input.
         """
-        if not self.enabled or channel_type != 1 or recipient_id != self.owner:
+        if not self.enabled or recipient_id != self.owner:
             return False
         if not isinstance(dispatch, dict) or dispatch.get("t") != "MESSAGE_CREATE" or dispatch.get("op") != 0:
             return False
         d = dispatch.get("d", {})
         if not isinstance(d, dict) or not isinstance(d.get("author"), dict):
             return False
+        if not self.scope.accepts(channel_type, d.get("channel_id"), d.get("guild_id")):
+            return False
+        if self.scope.mode == "guild_mentions" and not self.scope.mentions_bot(d.get("content"), d.get("mentions"), self.bot):
+            return False
         a = d["author"]
-        if (d.get("guild_id") or d.get("webhook_id") or a.get("bot") or a.get("system")
+        if (d.get("webhook_id") or a.get("bot") or a.get("system")
                 or a.get("id") != self.owner or d.get("type", 0) != 0):
             return False
         if not all(isinstance(d.get(k), str) and 1 <= len(d[k]) <= 20 and d[k].isascii() and d[k].isdigit()
@@ -286,7 +302,7 @@ class Bridge:
             raise Fault(-32000, "Prototype storage capacity reached")
         if self.db.execute("SELECT count(*) FROM messages WHERE received>?", (self.clock() - 60,)).fetchone()[0] >= 30:
             raise Fault(-32000, "Owner rate limit reached")
-        event = {"eventId": "discord_" + d["id"], "name": EVENT, "timestamp": iso(happened.timestamp()),
+        event = {"eventId": "discord_" + d["id"], "name": self.event, "timestamp": iso(happened.timestamp()),
                  "data": {"message_id": d["id"], "owner_id": self.owner, "text": text}, "cursor": None}
         with self.db:
             self.db.execute("INSERT INTO messages VALUES (?,?,?,?,NULL,NULL)",
@@ -338,6 +354,8 @@ class Bridge:
         row = self.db.execute("SELECT * FROM messages WHERE id=?", (mid,)).fetchone()
         if not row or self.clock() - row["received"] > 600:
             raise Fault(-32602, "Unknown or expired message")
+        if self.scope.mode == "guild_mentions" and row["channel"] != self.scope.channel_id:
+            raise Fault(-32602, "Message destination is outside configured scope")
         if not self.db.execute('''SELECT 1 FROM deliveries d JOIN subscriptions s ON s.id=d.sub
             WHERE d.message=? AND d.status='sent' AND s.expires>?''', (mid, self.clock())).fetchone():
             raise Fault(-32602, "Message has no active delivered subscription")
@@ -377,7 +395,10 @@ class Bridge:
                 result = {"resultType": "complete", "supportedVersions": [VERSION],
                           "capabilities": {"tools": {}, "events": {}}}
             elif method == "events/list":
-                result = {"events": [EVENT_DEFINITION]}
+                definition = dict(EVENT_DEFINITION, name=self.event)
+                if self.scope.mode == "guild_mentions":
+                    definition["description"] = "An explicit bot mention by the configured owner in the sole allowed guild text channel."
+                result = {"events": [definition]}
             elif method == "events/subscribe":
                 result = self.subscribe(params)
             elif method == "events/unsubscribe":

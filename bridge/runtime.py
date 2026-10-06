@@ -32,14 +32,14 @@ async def serve(config, *, register_commands=False):
     async def ingest(dispatch, **metadata):
         return await actor.ingest(dispatch, **metadata)
 
-    bot = DiscordBot(config.owner_discord_id, config.bot_discord_id, ingest)
+    bot = DiscordBot(config.owner_discord_id, config.bot_discord_id, ingest, scope=config.scope)
     loop = asyncio.get_running_loop()
     sender = DiscordSender(bot, loop)
 
     def factory():
         core = Bridge(state, owner_id=config.owner_discord_id, bot_id=config.bot_discord_id,
                       bearer=INTERNAL, callback_hosts=config.callback_hosts,
-                      webhook=HTTPSWebhook(config.callback_hosts), discord=sender)
+                      webhook=HTTPSWebhook(config.callback_hosts), discord=sender, scope=config.scope)
         core.bind_principal(config.oauth_issuer + "|" + config.oauth_subject)
         return core
 

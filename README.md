@@ -1,6 +1,7 @@
 # Discord Dot Bridge
 
-An experimental, owner-only Discord DM bridge to an **existing ChatGPT dot**.
+An experimental, owner-only Discord bridge to an **existing ChatGPT dot**.
+Use a bot DM or explicit bot mentions in one configured private guild text channel.
 MIT licensed. This project is not affiliated with OpenAI or Discord.
 
 **Status:** real Discord Gateway/REST, MCP HTTP, OAuth resource-server, and signed
@@ -38,9 +39,10 @@ working tokens, external messages, or platform grants are needed.
 
 ## Implemented
 
-- Official Discord bot API through `discord.py`, DM intent only (4096), bot
-  identity validation, fresh channel/recipient checks, reconnect/resume and REST
-  rate-limit handling. Guilds, group DMs, non-owner authors and bot echoes are blocked.
+- Official Discord bot API through `discord.py`: DM intent (4096) by default;
+  opt-in guild mention mode uses Guilds + Guild Messages (513), never the privileged
+  Message Content intent. Identity, exact destination and fresh channel checks
+  reject other guilds/channels, group DMs, threads, non-owner authors and bot echoes.
 - Version-specific MCP **2026-07-28** Streamable HTTP JSON responses: stateless
   POST `/mcp`, required metadata/header validation, `server/discover`, tools and
   webhook events. Legacy `initialize`, polling and streaming events are not supported.
