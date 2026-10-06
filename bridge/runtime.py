@@ -11,9 +11,10 @@ from .core import Bridge
 from .discord_adapter import DiscordBot, DiscordSender
 from .http_server import INTERNAL, SerialCore, make_app
 from .network import HTTPSWebhook
+from .commands import OwnerCommands
 
 
-async def serve(config):
+async def serve(config, *, register_commands=False):
     token = read_secret(config.discord_bot_token_file)
     verifier = OAuthVerifier(issuer=config.oauth_issuer, resource=config.resource,
                              subject=config.oauth_subject, jwks_file=config.jwks_file,
@@ -43,6 +44,7 @@ async def serve(config):
         return core
 
     actor = SerialCore(factory, verifier)
+    commands = OwnerCommands(bot, actor, config.resource)
     app = make_app(actor, verifier, allowed_hosts=[urlsplit(config.resource).netloc,
                    f"127.0.0.1:{config.listen_port}"], allowed_origins=config.allowed_origins or ())
     runner = web.AppRunner(app, access_log=None, shutdown_timeout=20)
@@ -59,6 +61,10 @@ async def serve(config):
             await bot.login(token)
             if not bot.user or str(bot.user.id) != config.bot_discord_id or not bot.user.bot:
                 raise ValueError("Token does not belong to configured bot")
+            if register_commands:
+                # This dedicated application's three global commands are replaced only
+                # when the operator explicitly requests registration.
+                await commands.tree.sync()
             await runner.setup()
             await web.TCPSite(runner, config.listen_host, config.listen_port).start()
             pump_task = asyncio.create_task(pump())

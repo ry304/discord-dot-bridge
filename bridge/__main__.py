@@ -12,6 +12,8 @@ def main():
     parser.add_argument("command", choices=["demo", "validate-config", "serve"])
     parser.add_argument("--config")
     parser.add_argument("--enable-network", action="store_true")
+    parser.add_argument("--register-commands", action="store_true",
+                        help="Explicitly register the dedicated app's owner-only global commands")
     args = parser.parse_args()
     if args.command != "demo":
         from .config import Config
@@ -26,7 +28,7 @@ def main():
         import asyncio
         from .runtime import serve
         try:
-            asyncio.run(serve(config))
+            asyncio.run(serve(config, register_commands=args.register_commands))
         except KeyboardInterrupt:
             pass
         except Exception:

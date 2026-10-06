@@ -6,5 +6,6 @@ RUN pip install --no-cache-dir -r requirements.lock
 COPY bridge ./bridge
 COPY tests ./tests
 COPY integration ./integration
+RUN chmod -R a+rX /app/bridge /app/tests /app/integration
 USER 65532:65532
 CMD ["python", "-m", "bridge", "demo"]

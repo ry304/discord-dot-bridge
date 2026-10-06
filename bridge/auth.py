@@ -1,5 +1,6 @@
 """OAuth resource-server verification; authorization/PKCE is handled by an IdP."""
 import json
+import os
 from pathlib import Path
 import jwt
 
@@ -20,6 +21,15 @@ class OAuthVerifier:
             return self.enabled_file.read_text().strip() == "enabled"
         except OSError:
             return False
+
+    def disable(self):
+        if self.enabled_file.is_symlink():
+            raise ValueError("Enable file must not be a symlink")
+        # Truncation is fail-closed: only the exact word 'enabled' authorizes work.
+        with self.enabled_file.open("w") as file:
+            file.write("disabled\n")
+            file.flush()
+            os.fsync(file.fileno())
 
     def verify(self, authorization):
         if not self.enabled() or not isinstance(authorization, str) or not authorization.startswith("Bearer "):

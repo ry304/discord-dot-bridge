@@ -5,7 +5,8 @@ MIT licensed. This project is not affiliated with OpenAI or Discord.
 
 **Status:** real Discord Gateway/REST, MCP HTTP, OAuth resource-server, and signed
 webhook adapters are implemented and tested against local mock services. A real
-ChatGPT account, dot, bot, identity provider and deployment have **not** been tested.
+ChatGPT account, dot, bot and identity provider have **not** been tested together.
+Metadata-only Docker staging is verified; live bridge activation remains pending.
 There is no claim of verified end-to-end operation with ChatGPT.
 
 ```text
@@ -55,6 +56,11 @@ working tokens, external messages, or platform grants are needed.
   remains `unknown`, requiring reconciliation instead of automatic resend.
 - Strict configuration validation, secure token-file input, loopback-only listener,
   persistent disable file, bounded serialized worker, and no content/request logs.
+- Owner-only `/setup`, `/status`, `/disconnect` commands, restricted to User Install
+  and the app DM, with private responses and explicit command registration.
+  [Discord setup](docs/DISCORD-SETUP.md) explains their limits.
+- A separate [metadata-only setup mode](docs/SETUP-MODE.md) rejects all MCP actions
+  while infrastructure is being prepared, without loading Discord credentials.
 
 ## Platform prerequisites
 
@@ -72,6 +78,7 @@ Follow [the setup and live acceptance guide](docs/LIVE-PLAN.md). You need an own
 numeric Discord ID, a bot you own, an existing dot with custom MCP Events access,
 an OAuth identity provider, and an approved HTTPS endpoint or supported tunnel.
 ChatGPT cannot send a custom static API key; the live adapter uses OAuth.
+See [provider compatibility options](docs/OAUTH-PROVIDERS.md); no vendor is required.
 
 Copy `config.example.json` to ignored `config.local.json`, replace all synthetic
 IDs/hosts and absolute paths, and validate without connecting or reading secrets:

@@ -55,6 +55,25 @@ class SerialCore:
         await self.submit(self.bridge.close)
         self.pool.shutdown(wait=True)
 
+    async def status(self):
+        def run():
+            db = self.bridge.db
+            return {"enabled": self.verifier.enabled(),
+                    "subscriptions": db.execute("SELECT count(*) FROM subscriptions WHERE expires>?", (self.bridge.clock(),)).fetchone()[0],
+                    "pending": db.execute("SELECT count(*) FROM deliveries WHERE status='pending'").fetchone()[0]}
+        return await self.submit(run)
+
+    async def disconnect(self):
+        # Disable authorization immediately, before waiting for earlier serialized work.
+        self.verifier.disable()
+        def run():
+            self.bridge.enabled = False
+            self.bridge.verified.clear()
+            with self.bridge.db:
+                self.bridge.db.execute("DELETE FROM deliveries")
+                self.bridge.db.execute("DELETE FROM subscriptions")
+        await self.submit(run)
+
 
 def error(rid, code, message, status=400, data=None):
     body = {"jsonrpc": "2.0", "error": {"code": code, "message": message}}
