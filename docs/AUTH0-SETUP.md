@@ -31,6 +31,9 @@ ChatGPT connection settings. The bridge needs public signing keys, not a client 
 5. Expose the authenticated endpoint through the approved HTTPS route. A metadata-only
    staging server can advertise discovery while denying every MCP POST; it cannot
    complete functional connection testing. Verify HTTPS and 401 behavior first.
+   Before asking the user to create a connection that needs authenticated discovery,
+   switch to the owner-bound catalog-only process described below. Do not assume
+   ChatGPT will save a draft or display a callback before authenticating.
 6. The user creates the MCP connection in ChatGPT using the resource URL and manual
    OAuth client settings. Copy the exact redirect URI from that connection's
    management page into Auth0 Allowed Callback URLs before login/consent. Do not
@@ -68,3 +71,53 @@ command-only Discord process unchanged until the account settings are resolved.
 
 - <https://auth0.com/docs/get-started/applications/update-grant-types>
 - <https://auth0.com/docs/secure/tokens/refresh-tokens/get-refresh-tokens>
+
+## Authenticated catalog bootstrap without Discord forwarding
+
+`python -m bridge.discovery_server --config /private/discovery.json` serves only
+OAuth-verified `server/discover`, `tools/list` and `events/list`. It uses the same
+signature, issuer, resource audience, exact owner subject, scope and lifetime
+checks as the live service. It refuses `events/subscribe`, `events/unsubscribe`,
+`tools/call`, legacy `initialize` and all other operations. It has no bot client,
+token mount, database, callback transport or delivery worker. Its catalog clearly
+states that actions are disabled. The Discord command-only process can stay up.
+
+Example discovery configuration (all paths are deployment-private):
+
+```json
+{
+  "resource": "https://bridge.example.test/mcp",
+  "oauth_issuer": "https://issuer.example.test/",
+  "oauth_subject_file": "/private/owner.subject",
+  "jwks_file": "/private/public-jwks.json",
+  "enabled_file": "/private/discovery.enabled",
+  "discord_mode": "guild_mentions"
+}
+```
+
+Configuration and subject files require mode 0600, and the enable file must contain
+`enabled`. Missing owner identity or a disabled flag prevents startup. No identity
+is automatically learned from the first login: that would allow an unintended user
+to become the owner.
+
+In Auth0, the operator selects the intended application user under User Management
+> Users, verifies the login connection/account and privately copies its full
+`user_id`. This is not the application Client ID or the tenant dashboard-admin ID.
+An Auth0 dashboard account does not establish an application-user profile. If no
+matching user exists, resolve the intended application login/account first; do not
+create a user, password, grant or wildcard subject silently.
+
+The owner can run `python3 scripts/set_owner_subject.py /private/owner.subject` in
+an interactive terminal to store the value without echoing it or putting it in
+shell history. The helper refuses to overwrite an existing identity file. The
+agent can check existence/permissions without reading the value. The server
+consumes that protected file locally and never logs it.
+
+After this mode is active, the user performs ChatGPT registration and OAuth login.
+Use the exact displayed callback or actual client redirect, never a guessed ID.
+Confirm the nonsecret `mcp.discovery_authenticated owner_verified=true` milestone
+and successful tool discovery. This proves only an accepted access token/catalog,
+not refresh, Discord forwarding or dot subscription. Live activation is a separate
+operator step after consent and callback scope review; refresh the catalog then.
+
+- <https://auth0.com/docs/manage-users/user-accounts/user-profiles>

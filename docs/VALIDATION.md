@@ -2,7 +2,7 @@
 
 Local Windows/Python 3.12.10 checks on 2026-10-06:
 
-**Passed: 31 core/config/scope tests, 22 local adapter/command tests, and the synthetic demo.**
+**Passed: 31 core/config/scope tests, 27 local adapter/command/discovery tests, and the synthetic demo.**
 
 - Core/security/config tests exercise authentication, owner/DM filtering, persistent
   subscriptions, expiry/rotation, signatures, callback policy, dedup/replay, bounded
@@ -24,6 +24,10 @@ Local Windows/Python 3.12.10 checks on 2026-10-06:
   reply destinations, fresh SDK channel resolution, nonprivileged intents and
   ephemeral guild command responses. Guild adapter checks use typed SDK mocks;
   actual Discord guild delivery/installation is still unverified.
+- Authenticated catalog bootstrap checks verify real synthetic JWTs, reject wrong
+  owner/audience/issuer/scope/expiry, enforce immediate disable, and refuse all
+  subscriptions/replies even for the authenticated owner. No state files or
+  delivery transport are created by that mode.
 
 Reproduce with `python -m tests`, `python -m integration`, `python -m bridge demo`.
 The first suite forbids sockets/DNS. The integration runner allows only loopback.
