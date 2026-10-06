@@ -20,6 +20,10 @@ ChatGPT connection settings. The bridge needs public signing keys, not a client 
    `client_secret_post` for this manual confidential-client path. Add refresh-token
    grant only when required. Limit user-delegated API access to this client and scope;
    do not enable all third-party applications. Configure the intended user connection.
+   Grant checkboxes are under Applications > Applications > the application >
+   Settings > Show Advanced Settings (bottom of page) > Grant Types. They may
+   already be enabled. Refresh-token issuance also requires `offline_access` in
+   the authorization request, in addition to the API's Allow Offline Access setting.
 4. Fetch public OIDC discovery over HTTPS and verify issuer, authorization/token
    endpoints, S256 support and RS256 JWKS. Keep the exact issuer spelling including
    trailing slash in bridge configuration and protected-resource metadata. Maintain
@@ -53,3 +57,14 @@ Sources checked 2026-10-06:
 
 The hosted provider receives login identity and authentication telemetry. Discord
 messages and dot context are not needed for identity-provider configuration.
+
+## Resume a blocked dashboard setup
+
+If Grant Types is not visible, first inspect a screenshot of the application type
+and bottom of its Settings page, with secrets concealed. Do not keep repeating
+settings lists, guess a different UI path, or enable machine-to-machine credentials
+as a substitute for owner login. Leave the metadata-only endpoint closed and the
+command-only Discord process unchanged until the account settings are resolved.
+
+- <https://auth0.com/docs/get-started/applications/update-grant-types>
+- <https://auth0.com/docs/secure/tokens/refresh-tokens/get-refresh-tokens>
