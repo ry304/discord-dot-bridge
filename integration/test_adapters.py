@@ -33,6 +33,23 @@ MESSAGE = str(discord.utils.time_snowflake(datetime.now(timezone.utc)))
 
 
 class LocalAdapters(unittest.IsolatedAsyncioTestCase):
+    async def test_live_status_authenticated_read_only(self):
+        before = (list(self.events), list(self.replies))
+        code, result = await self.rpc("tools/list")
+        self.assertEqual(code, 200)
+        self.assertIn("discord_bridge_status", [t["name"] for t in result["result"]["tools"]])
+        self.actor.discord_ready = lambda: True
+        args = {"name": "discord_bridge_status", "arguments": {}}
+        code, result = await self.rpc("tools/call", args)
+        self.assertEqual(code, 200)
+        status = json.loads(result["result"]["content"][0]["text"])
+        self.assertEqual(status["mode"], "live")
+        self.assertTrue(status["discord_connected"])
+        self.assertEqual(status["active_subscriptions"], 0)
+        self.assertEqual((list(self.events), list(self.replies)), before)
+        self.assertEqual((await self.rpc("tools/call", args, token=self.token(sub="other")))[0], 401)
+        self.assertEqual((await self.rpc("tools/call", {**args, "arguments": {"extra": True}}))[0], 400)
+
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)

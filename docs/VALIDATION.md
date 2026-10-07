@@ -2,7 +2,7 @@
 
 Local Windows/Python 3.12.10 checks on 2026-10-06:
 
-**Passed: 31 core/config/scope tests, 32 local adapter/command/discovery/probe tests, and the synthetic demo.**
+**Passed: 31 core/config/scope tests, 33 local adapter/command/discovery/probe tests, and the synthetic demo.**
 
 - Core/security/config tests exercise authentication, owner/DM filtering, persistent
   subscriptions, expiry/rotation, signatures, callback policy, dedup/replay, bounded

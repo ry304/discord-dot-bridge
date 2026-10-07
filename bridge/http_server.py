@@ -9,6 +9,10 @@ from .core import VERSION, MAX_BODY
 
 META = "io.modelcontextprotocol/"
 INTERNAL = "IN-PROCESS-ONLY-NOT-A-NETWORK-CREDENTIAL"
+STATUS_TOOL = {"name": "discord_bridge_status", "description": "Read authenticated bridge readiness and bounded queue counts without Discord or callback network access.",
+    "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    "securitySchemes": [{"type": "oauth2", "scopes": ["discord:bridge"]}],
+    "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}}
 
 
 class SerialCore:
@@ -16,6 +20,7 @@ class SerialCore:
         self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="bridge-state")
         self.bridge = self.pool.submit(factory).result()
         self.verifier = verifier
+        self.discord_ready = lambda: False
         self.slots = asyncio.Semaphore(32)
 
     async def submit(self, operation):
@@ -36,7 +41,19 @@ class SerialCore:
             claims = self.verifier.verify(authorization)
             self.bridge.enabled = self.verifier.enabled()
             self.bridge.auth_until = claims["exp"]
-            return self.bridge.rpc(request, "Bearer " + INTERNAL)
+            if request.get("method") == "tools/call" and request.get("params", {}).get("name") == "discord_bridge_status":
+                if request["params"].get("arguments", {}) != {}:
+                    return {"jsonrpc": "2.0", "id": request["id"], "error": {"code": -32602, "message": "No arguments accepted"}}
+                ready = bool(self.discord_ready())
+                value = {"mode": "live", "discord_connected": ready,
+                         "subscriptions_enabled": self.bridge.enabled, "replies_enabled": self.bridge.enabled and ready,
+                         "active_subscriptions": self.bridge.db.execute("SELECT count(*) FROM subscriptions WHERE expires>?", (self.bridge.clock(),)).fetchone()[0],
+                         "pending_events": self.bridge.db.execute("SELECT count(*) FROM deliveries WHERE status='pending'").fetchone()[0]}
+                return {"jsonrpc": "2.0", "id": request["id"], "result": {"content": [{"type": "text", "text": json.dumps(value)}], "isError": False}}
+            response = self.bridge.rpc(request, "Bearer " + INTERNAL)
+            if request.get("method") == "tools/list" and "result" in response:
+                response["result"]["tools"].append(STATUS_TOOL)
+            return response
         return await self.submit(run)
 
     async def ingest(self, dispatch, **metadata):

@@ -44,6 +44,7 @@ async def serve(config, *, register_commands=False):
         return core
 
     actor = SerialCore(factory, verifier)
+    actor.discord_ready = bot.is_ready
     commands = OwnerCommands(bot, actor, config.resource)
     app = make_app(actor, verifier, allowed_hosts=[urlsplit(config.resource).netloc,
                    f"127.0.0.1:{config.listen_port}"], allowed_origins=config.allowed_origins or ())
