@@ -8,6 +8,18 @@ from bridge.synthetic import OWNER, SECRET
 
 
 class ProbeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_status_only_never_captures_and_declares_oauth(self):
+        with tempfile.TemporaryDirectory() as folder:
+            actor = ProbeActor(Mock(), "guild_mentions", OWNER, Path(folder) / "host", False)
+            catalog = await actor.rpc({"id": 1, "method": "tools/list"}, "synthetic")
+            self.assertEqual(catalog["result"]["tools"][-1]["securitySchemes"], [{"type": "oauth2", "scopes": ["discord:bridge"]}])
+            actor.deadline = float("inf")
+            result = await actor.rpc({"id": 2, "method": "events/subscribe", "params": {
+                "name": "discord.channel.mentioned", "arguments": {"owner_id": OWNER},
+                "delivery": {"mode": "webhook", "url": "https://callback.example.test/private", "secret": SECRET}}}, "synthetic")
+            self.assertIn("error", result)
+            self.assertFalse(list(Path(folder).iterdir()))
+
     async def test_status_authenticated_read_only_and_expiry(self):
         with tempfile.TemporaryDirectory() as folder:
             verifier = Mock()

@@ -16,6 +16,9 @@ owner/event, invalid tokens or malformed destinations cannot populate the file.
 The authenticated `discord_bridge_status` read-only action reports only setup
 booleans, never identities, destinations, messages or secrets. Refresh the plugin
 catalog and call it successfully before attempting platform event setup.
+Use `--status-only` while waiting for the platform catalog: capture stays disabled
+regardless of elapsed time. The first authenticated catalog response emits only
+`mcp.status_catalog status_included=true`; it contains no request or identity data.
 
 Run with `python -m bridge.callback_probe --config /private/discovery.json
 --scope-config /private/setup.guild.json --capture-dir /probe`. Mount only the
