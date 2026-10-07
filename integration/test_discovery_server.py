@@ -57,6 +57,9 @@ class DiscoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status, 200)
             result = (await response.json())["result"]
             self.assertIn(key, result)
+            if method in ("server/discover", "tools/list"):
+                self.assertEqual(result["ttlMs"], 0)
+                self.assertEqual(result["cacheScope"], "private")
             if key == "events":
                 self.assertEqual(result[key][0]["name"], "discord.channel.mentioned")
         self.assertEqual(set(self.root.iterdir()), before)

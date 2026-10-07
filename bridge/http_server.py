@@ -169,6 +169,8 @@ def make_app(actor, verifier, *, allowed_hosts, allowed_origins=()):
             return error(rid, -32603, "Internal bridge error", 500)
         if "result" in response:
             response["result"]["resultType"] = "complete"
+            if method in ("server/discover", "tools/list"):
+                response["result"].update(ttlMs=0, cacheScope="private")
             response["result"]["_meta"] = {META + "serverInfo": {"name": "discord-dot-bridge", "version": "0.2.0"}}
             return web.json_response(response)
         code = response["error"]["code"]

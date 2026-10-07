@@ -45,3 +45,19 @@ challenge before an owner mention/reply test. DNS/IP/TLS checks still apply on
 every outgoing request, even after hostname approval.
 
 Source: <https://developers.openai.com/plugins/build/mcp-events>
+
+## Catalog refresh diagnosis
+
+`server/discover` advertises the tools capability; individual definitions belong
+in `tools/list`, not the OAuth resource metadata. Both discovery and tool-list
+responses include MCP 2 cache hints `ttlMs: 0` and `cacheScope: "private"`.
+HTTP `Cache-Control: no-store` alone does not replace these protocol fields.
+See <https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/caching>.
+
+OpenAI's documented refresh procedure ends with testing in a new conversation:
+<https://developers.openai.com/plugins/deploy/connect-chatgpt#refresh-metadata>.
+If a refreshed catalog is confirmed at the server but an existing conversation
+still exposes old tools, use a fresh conversation only to diagnose tool visibility
+and read status. Do not create a replacement assistant or move the event subscription
+away from the intended existing dot. A successful diagnostic in another conversation
+does not itself establish that the intended dot's active tool context has updated.
